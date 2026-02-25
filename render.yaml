@@ -1,0 +1,13 @@
+# Example Render Web Service config snippet
+services:
+  - type: web
+    name: telegram-legal-bot
+    env: python
+    repo: https://github.com/ВАШ/РЕПО
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: BOT_TOKEN
+      - key: WEBHOOK_HOST
+      - key: WEBHOOK_PATH
+      - key: DATABASE_URL
