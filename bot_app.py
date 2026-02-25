@@ -1,7 +1,13 @@
 import logging, time
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from aiogram.filters import Command, Text
+from aiogram.filters import Command
+try:
+    # new location (aiogram 3.x variants)
+    from aiogram.filters.text import Text
+except Exception:
+    # fallback (older variants)
+    from aiogram.filters import Text
 from core import cfg, DB
 from features import list_templates, render_template, get_disclaimer, is_rate_limited
 from typing import Dict, Any
