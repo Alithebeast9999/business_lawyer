@@ -1,9 +1,8 @@
-# bot_app.py
 import logging
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import Message, KeyboardButton, ReplyKeyboardMarkup, CallbackQuery, Update
 from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder  # добавлено для сборки инлайн-клавиатуры
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from core import cfg, DB
 from features import list_templates, render_template, get_disclaimer, is_rate_limited
 from typing import Dict, Any
@@ -16,7 +15,12 @@ class BotApp:
         self.dp = Dispatcher()
         self.db = DB(db_url)
         self._active = {}
+        # Регистрируем глобальный обработчик ошибок
+        self.dp.errors.register(self.errors_handler)
         self._register_handlers()
+
+    async def errors_handler(self, update: Update, exception: Exception):
+        logger.exception("Critical error in update %s: %s", update, exception)
 
     async def init_app_for_runtime(self, app=None):
         logger.info('Init DB')
@@ -37,12 +41,11 @@ class BotApp:
         ], resize_keyboard=True)
         return kb
 
-    def _templates_keyboard(self) -> InlineKeyboardMarkup:
-        # Используем InlineKeyboardBuilder для корректного создания клавиатуры
+    def _templates_keyboard(self):
         builder = InlineKeyboardBuilder()
         for key in list_templates():
             builder.button(text=key.replace('_',' ').title(), callback_data=f"tpl:{key}")
-        builder.adjust(2)  # задаём количество кнопок в ряду (аналог row_width)
+        builder.adjust(2)  # по две кнопки в ряду
         return builder.as_markup()
 
     def _register_handlers(self):
@@ -111,6 +114,10 @@ class BotApp:
 
         @self.dp.message(F.text)
         async def fallback(message: Message):
+            await message.answer('Не понял. Выберите пункт меню или используйте /start.', reply_markup=self._main_menu_keyboard())
+
+# Экземпляр для импорта в main.py
+bot_app = BotApp(token=cfg.BOT_TOKEN, db_url=cfg.DATABASE_URL)
             await message.answer('Не понял. Выберите пункт меню или используйте /start.', reply_markup=self._main_menu_keyboard())
 
 # Экземпляр приложения для импорта в main.py
