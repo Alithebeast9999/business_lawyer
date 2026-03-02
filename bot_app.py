@@ -1,13 +1,8 @@
-import logging, time
+# bot_app.py
+import logging
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.filters import Command
-try:
-    # new location (aiogram 3.x variants)
-    from aiogram.filters.text import Text
-except Exception:
-    # fallback (older variants)
-    from aiogram.filters import Text
 from core import cfg, DB
 from features import list_templates, render_template, get_disclaimer, is_rate_limited
 from typing import Dict, Any
@@ -58,8 +53,12 @@ class BotApp:
                 reply_markup=self._main_menu_keyboard()
             )
 
-        @self.dp.message(Text(equals='📄 Получить шаблон', ignore_case=True))
+        # Button: "📄 Получить шаблон"
+        @self.dp.message()
         async def menu_get_template(message: Message):
+            # check that user actually pressed/clicked the button (or typed exactly)
+            if not message.text or message.text.strip().lower() != '📄 получить шаблон':
+                return
             if is_rate_limited(message.from_user.id, 'menu'):
                 await message.answer('Пожалуйста, подождите пару секунд перед следующей операцией.')
                 return
@@ -69,23 +68,34 @@ class BotApp:
                 return
             await message.answer('Выберите шаблон:', reply_markup=kb)
 
-        @self.dp.callback_query(Text(startswith='tpl:'))
+        # Callback from template inline buttons
+        @self.dp.callback_query()
         async def on_template_selected(query: CallbackQuery):
             await query.answer()  # acknowledge
+            # ensure callback data is for template selection
+            if not query.data or not query.data.startswith('tpl:'):
+                return
             if is_rate_limited(query.from_user.id, 'get_template', cooldown_seconds=5):
                 await query.message.answer('Вы слишком часто запрашиваете шаблоны. Подождите немного.')
                 return
             key = query.data.split(':',1)[1]
             # Simple example context. Later we can ask user to fill fields.
-            context: Dict[str,Any] = {'party_a':'Компания A', 'party_b':'Компания B', 'client_name': query.from_user.full_name or query.from_user.username or str(query.from_user.id)}
+            context: Dict[str,Any] = {
+                'party_a':'Компания A', 
+                'party_b':'Компания B', 
+                'client_name': query.from_user.full_name or query.from_user.username or str(query.from_user.id)
+            }
             bio = render_template(key, context)
             if bio:
                 await self.bot.send_document(chat_id=query.from_user.id, document=bio, caption=f'Шаблон: {key}')
             else:
                 await query.message.answer('Не удалось отрендерить шаблон.')
 
-        @self.dp.message(Text(equals='ℹ️ О боте', ignore_case=True))
+        # Button: "ℹ️ О боте"
+        @self.dp.message()
         async def about_bot(message: Message):
+            if not message.text or message.text.strip().lower() != 'ℹ️ о боте':
+                return
             await message.answer(get_disclaimer())
 
         @self.dp.message(Command(commands=['get_template']))
@@ -103,6 +113,7 @@ class BotApp:
 
         @self.dp.message()
         async def fallback(message: Message):
+            # если сообщение не попало ни под одно из условий выше
             await message.answer('Не понял. Выберите пункт меню или используйте /start.', reply_markup=self._main_menu_keyboard())
 
 # create instance for main.py to import
