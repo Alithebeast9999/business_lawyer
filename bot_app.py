@@ -3,6 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder  # добавлено для сборки инлайн-клавиатуры
 from core import cfg, DB
 from features import list_templates, render_template, get_disclaimer, is_rate_limited
 from typing import Dict, Any
@@ -37,13 +38,14 @@ class BotApp:
         return kb
 
     def _templates_keyboard(self) -> InlineKeyboardMarkup:
-        kb = InlineKeyboardMarkup(row_width=2)
+        # Используем InlineKeyboardBuilder для корректного создания клавиатуры
+        builder = InlineKeyboardBuilder()
         for key in list_templates():
-            kb.insert(InlineKeyboardButton(text=key.replace('_',' ').title(), callback_data=f"tpl:{key}"))
-        return kb
+            builder.button(text=key.replace('_',' ').title(), callback_data=f"tpl:{key}")
+        builder.adjust(2)  # задаём количество кнопок в ряду (аналог row_width)
+        return builder.as_markup()
 
     def _register_handlers(self):
-        # Команда /start
         @self.dp.message(Command(commands=['start']))
         async def cmd_start(message: Message):
             await message.answer(
@@ -53,7 +55,6 @@ class BotApp:
                 reply_markup=self._main_menu_keyboard()
             )
 
-        # Кнопка "📄 Получить шаблон"
         @self.dp.message(F.text == '📄 Получить шаблон')
         async def menu_get_template(message: Message):
             if is_rate_limited(message.from_user.id, 'menu'):
@@ -65,22 +66,18 @@ class BotApp:
                 return
             await message.answer('Выберите шаблон:', reply_markup=kb)
 
-        # Кнопка "ℹ️ О боте"
         @self.dp.message(F.text == 'ℹ️ О боте')
         async def about_bot(message: Message):
             await message.answer(get_disclaimer())
 
-        # Кнопка "📂 Мои запросы"
         @self.dp.message(F.text == '📂 Мои запросы')
         async def my_requests(message: Message):
             await message.answer("Функция в разработке.")
 
-        # Кнопка "📞 Связаться с юристом"
         @self.dp.message(F.text == '📞 Связаться с юристом')
         async def contact_lawyer(message: Message):
             await message.answer("Для связи с юристом напишите на email: lawyer@example.com")
 
-        # Обработка инлайн-кнопок выбора шаблона
         @self.dp.callback_query(F.data.startswith('tpl:'))
         async def on_template_selected(query: CallbackQuery):
             await query.answer()
@@ -99,7 +96,6 @@ class BotApp:
             else:
                 await query.message.answer('Не удалось отрендерить шаблон.')
 
-        # Команда /get_template
         @self.dp.message(Command(commands=['get_template']))
         async def cmd_get_template(message: Message):
             args = message.text.split(maxsplit=1)
@@ -113,7 +109,6 @@ class BotApp:
             else:
                 await message.answer('Шаблон не найден. Используйте кнопку "Получить шаблон".')
 
-        # Обработчик всех остальных текстовых сообщений
         @self.dp.message(F.text)
         async def fallback(message: Message):
             await message.answer('Не понял. Выберите пункт меню или используйте /start.', reply_markup=self._main_menu_keyboard())
