@@ -1,6 +1,6 @@
 # bot_app.py
 import logging
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.filters import Command
 from core import cfg, DB
@@ -14,7 +14,6 @@ class BotApp:
         self.bot = Bot(token=token)
         self.dp = Dispatcher()
         self.db = DB(db_url)
-        # keep small in-memory map for active tasks
         self._active = {}
         self._register_handlers()
 
@@ -44,6 +43,7 @@ class BotApp:
         return kb
 
     def _register_handlers(self):
+        # Команда /start
         @self.dp.message(Command(commands=['start']))
         async def cmd_start(message: Message):
             await message.answer(
@@ -53,12 +53,9 @@ class BotApp:
                 reply_markup=self._main_menu_keyboard()
             )
 
-        # Button: "📄 Получить шаблон"
-        @self.dp.message()
+        # Кнопка "📄 Получить шаблон"
+        @self.dp.message(F.text == '📄 Получить шаблон')
         async def menu_get_template(message: Message):
-            # check that user actually pressed/clicked the button (or typed exactly)
-            if not message.text or message.text.strip().lower() != '📄 получить шаблон':
-                return
             if is_rate_limited(message.from_user.id, 'menu'):
                 await message.answer('Пожалуйста, подождите пару секунд перед следующей операцией.')
                 return
@@ -68,21 +65,32 @@ class BotApp:
                 return
             await message.answer('Выберите шаблон:', reply_markup=kb)
 
-        # Callback from template inline buttons
-        @self.dp.callback_query()
+        # Кнопка "ℹ️ О боте"
+        @self.dp.message(F.text == 'ℹ️ О боте')
+        async def about_bot(message: Message):
+            await message.answer(get_disclaimer())
+
+        # Кнопка "📂 Мои запросы"
+        @self.dp.message(F.text == '📂 Мои запросы')
+        async def my_requests(message: Message):
+            await message.answer("Функция в разработке.")
+
+        # Кнопка "📞 Связаться с юристом"
+        @self.dp.message(F.text == '📞 Связаться с юристом')
+        async def contact_lawyer(message: Message):
+            await message.answer("Для связи с юристом напишите на email: lawyer@example.com")
+
+        # Обработка инлайн-кнопок выбора шаблона
+        @self.dp.callback_query(F.data.startswith('tpl:'))
         async def on_template_selected(query: CallbackQuery):
-            await query.answer()  # acknowledge
-            # ensure callback data is for template selection
-            if not query.data or not query.data.startswith('tpl:'):
-                return
+            await query.answer()
             if is_rate_limited(query.from_user.id, 'get_template', cooldown_seconds=5):
                 await query.message.answer('Вы слишком часто запрашиваете шаблоны. Подождите немного.')
                 return
             key = query.data.split(':',1)[1]
-            # Simple example context. Later we can ask user to fill fields.
             context: Dict[str,Any] = {
-                'party_a':'Компания A', 
-                'party_b':'Компания B', 
+                'party_a':'Компания A',
+                'party_b':'Компания B',
                 'client_name': query.from_user.full_name or query.from_user.username or str(query.from_user.id)
             }
             bio = render_template(key, context)
@@ -91,13 +99,7 @@ class BotApp:
             else:
                 await query.message.answer('Не удалось отрендерить шаблон.')
 
-        # Button: "ℹ️ О боте"
-        @self.dp.message()
-        async def about_bot(message: Message):
-            if not message.text or message.text.strip().lower() != 'ℹ️ о боте':
-                return
-            await message.answer(get_disclaimer())
-
+        # Команда /get_template
         @self.dp.message(Command(commands=['get_template']))
         async def cmd_get_template(message: Message):
             args = message.text.split(maxsplit=1)
@@ -111,10 +113,10 @@ class BotApp:
             else:
                 await message.answer('Шаблон не найден. Используйте кнопку "Получить шаблон".')
 
-        @self.dp.message()
+        # Обработчик всех остальных текстовых сообщений
+        @self.dp.message(F.text)
         async def fallback(message: Message):
-            # если сообщение не попало ни под одно из условий выше
             await message.answer('Не понял. Выберите пункт меню или используйте /start.', reply_markup=self._main_menu_keyboard())
 
-# create instance for main.py to import
+# Экземпляр приложения для импорта в main.py
 bot_app = BotApp(token=cfg.BOT_TOKEN, db_url=cfg.DATABASE_URL)
