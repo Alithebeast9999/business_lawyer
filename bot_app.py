@@ -15,7 +15,7 @@ class BotApp:
         self.dp = Dispatcher()
         self.db = DB(db_url)
         self._active = {}
-        # Регистрируем глобальный обработчик ошибок
+        # Глобальный обработчик ошибок
         self.dp.errors.register(self.errors_handler)
         self._register_handlers()
 
@@ -44,7 +44,7 @@ class BotApp:
     def _templates_keyboard(self):
         builder = InlineKeyboardBuilder()
         for key in list_templates():
-            builder.button(text=key.replace('_',' ').title(), callback_data=f"tpl:{key}")
+            builder.button(text=key.replace('_', ' ').title(), callback_data=f"tpl:{key}")
         builder.adjust(2)  # по две кнопки в ряду
         return builder.as_markup()
 
@@ -87,10 +87,10 @@ class BotApp:
             if is_rate_limited(query.from_user.id, 'get_template', cooldown_seconds=5):
                 await query.message.answer('Вы слишком часто запрашиваете шаблоны. Подождите немного.')
                 return
-            key = query.data.split(':',1)[1]
-            context: Dict[str,Any] = {
-                'party_a':'Компания A',
-                'party_b':'Компания B',
+            key = query.data.split(':', 1)[1]
+            context: Dict[str, Any] = {
+                'party_a': 'Компания A',
+                'party_b': 'Компания B',
                 'client_name': query.from_user.full_name or query.from_user.username or str(query.from_user.id)
             }
             bio = render_template(key, context)
@@ -114,11 +114,10 @@ class BotApp:
 
         @self.dp.message(F.text)
         async def fallback(message: Message):
-            await message.answer('Не понял. Выберите пункт меню или используйте /start.', reply_markup=self._main_menu_keyboard())
-
-# Экземпляр для импорта в main.py
-bot_app = BotApp(token=cfg.BOT_TOKEN, db_url=cfg.DATABASE_URL)
-            await message.answer('Не понял. Выберите пункт меню или используйте /start.', reply_markup=self._main_menu_keyboard())
+            await message.answer(
+                'Не понял. Выберите пункт меню или используйте /start.',
+                reply_markup=self._main_menu_keyboard()
+            )
 
 # Экземпляр приложения для импорта в main.py
 bot_app = BotApp(token=cfg.BOT_TOKEN, db_url=cfg.DATABASE_URL)
